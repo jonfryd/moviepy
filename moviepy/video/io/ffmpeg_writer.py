@@ -112,6 +112,12 @@ class FFMPEG_VideoWriter:
             "%dx%d" % (size[0], size[1]),
             "-pix_fmt",
             pixel_format,
+            "-color_primaries",
+            "bt2020",
+            "-color_trc",
+            "smpte2084",
+            "-colorspace",
+            "bt2020nc",
             "-r",
             "%.02f" % fps,
             "-an",
@@ -131,7 +137,10 @@ class FFMPEG_VideoWriter:
 
         if (codec == "libx264") and (size[0] % 2 == 0) and (size[1] % 2 == 0):
             cmd.extend(["-pix_fmt", "yuv420p"])
+        cmd.extend(["-pix_fmt", "yuv420p10le"])
         cmd.extend([filename])
+
+        print(cmd)
 
         popen_params = cross_platform_popen_params(
             {"stdout": sp.DEVNULL, "stderr": logfile, "stdin": sp.PIPE}
@@ -255,12 +264,12 @@ def ffmpeg_write_video(
         pixel_format=pixel_format,
     ) as writer:
         for t, frame in clip.iter_frames(
-            logger=logger, with_times=True, fps=fps, dtype="uint8"
+            logger=logger, with_times=True, fps=fps, dtype="uint16"
         ):
             if with_mask:
-                mask = 255 * clip.mask.get_frame(t)
-                if mask.dtype != "uint8":
-                    mask = mask.astype("uint8")
+                mask = 65535 * clip.mask.get_frame(t)
+                if mask.dtype != "uint16":
+                    mask = mask.astype("uint16")
                 frame = np.dstack([frame, mask])
 
             writer.write_frame(frame)

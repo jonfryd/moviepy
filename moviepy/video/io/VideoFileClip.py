@@ -124,7 +124,7 @@ class VideoFileClip(VideoClip):
             self.make_frame = lambda t: self.reader.get_frame(t)[:, :, :3]
 
             def mask_make_frame(t):
-                return self.reader.get_frame(t)[:, :, 3] / 255.0
+                return self.reader.get_frame(t)[:, :, 3] / 65535.0
 
             self.mask = VideoClip(
                 is_mask=True, make_frame=mask_make_frame

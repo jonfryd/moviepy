@@ -62,13 +62,13 @@ class FFMPEG_VideoReader:
         self.infos = infos
 
         self.pixel_format = pixel_format
-        self.depth = 4 if pixel_format[-1] == "a" else 3
+        self.depth = 4 if pixel_format[3] == "a" else 3
         # 'a' represents 'alpha' which means that each pixel has 4 values instead of 3.
         # See https://github.com/Zulko/moviepy/issues/1070#issuecomment-644457274
 
         if bufsize is None:
             w, h = self.size
-            bufsize = self.depth * w * h + 100
+            bufsize = self.depth * w * h * 2 + 100
 
         self.bufsize = bufsize
         self.initialize()
@@ -114,6 +114,9 @@ class FFMPEG_VideoReader:
                 "-",
             ]
         )
+
+        print(cmd)
+
         popen_params = cross_platform_popen_params(
             {
                 "bufsize": self.bufsize,
@@ -134,7 +137,7 @@ class FFMPEG_VideoReader:
         """Reads and throws away n frames"""
         w, h = self.size
         for i in range(n):
-            self.proc.stdout.read(self.depth * w * h)
+            self.proc.stdout.read(self.depth * w * h * 2)
 
             # self.proc.stdout.flush()
         self.pos += n
@@ -146,7 +149,7 @@ class FFMPEG_VideoReader:
         and stored in ``self.lastread``.
         """
         w, h = self.size
-        nbytes = self.depth * w * h
+        nbytes = self.depth * w * h * 2
 
         s = self.proc.stdout.read(nbytes)
 
@@ -184,10 +187,10 @@ class FFMPEG_VideoReader:
 
         else:
             if hasattr(np, "frombuffer"):
-                result = np.frombuffer(s, dtype="uint8")
+                result = np.frombuffer(s, dtype="uint16")
             else:
-                result = np.fromstring(s, dtype="uint8")
-            result.shape = (h, w, len(s) // (w * h))  # reshape((h, w, len(s)//(w*h)))
+                result = np.fromstring(s, dtype="uint16")
+            result.shape = (h, w, len(s) // (w * h * 2))  # reshape((h, w, len(s)//(w*h)))
             self.last_read = result
 
         # We have to do this down here because `self.pos` is used in the warning above

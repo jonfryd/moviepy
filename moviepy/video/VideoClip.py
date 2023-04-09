@@ -633,7 +633,7 @@ class VideoClip(Clip):
             post_array = np.hstack((post_array, x_1))
         return post_array
 
-    def blit_on(self, picture, t):
+    def blit_on(self, picture, t, rshift_bits):
         """Returns the result of the blit of the clip's frame at time `t`
         on the given `picture`, the position of the clip being given
         by the clip's ``pos`` attribute. Meant for compositing.
@@ -643,11 +643,11 @@ class VideoClip(Clip):
         ct = t - self.start  # clip time
 
         # GET IMAGE AND MASK IF ANY
-        img = self.get_frame(ct).astype("uint8")
-        im_img = Image.fromarray(img)
+        img = self.get_frame(ct).astype("uint16")
+        im_img = Image.fromarray(((img >> rshift_bits) & 0xff).astype('uint8'))
 
         if self.mask is not None:
-            mask = (self.mask.get_frame(ct) * 255).astype("uint8")
+            mask = (((self.mask.get_frame(ct) * 65535).astype("uint16") >> rshift_bits) & 0xff).astype("uint8")
             im_mask = Image.fromarray(mask).convert("L")
 
             if im_img.size != im_mask.size:
@@ -875,7 +875,7 @@ class VideoClip(Clip):
         if self.is_mask:
             return self
         else:
-            new_clip = self.image_transform(lambda pic: 1.0 * pic[:, :, canal] / 255)
+            new_clip = self.image_transform(lambda pic: 1.0 * pic[:, :, canal] / 65535)
             new_clip.is_mask = True
             return new_clip
 
@@ -883,7 +883,7 @@ class VideoClip(Clip):
         """Return a non-mask video clip made from the mask video clip."""
         if self.is_mask:
             new_clip = self.image_transform(
-                lambda pic: np.dstack(3 * [255 * pic]).astype("uint8")
+                lambda pic: np.dstack(3 * [65535 * pic]).astype("uint16")
             )
             new_clip.is_mask = False
             return new_clip
@@ -1034,25 +1034,27 @@ class ImageClip(VideoClip):
     """
 
     def __init__(
-        self, img, is_mask=False, transparent=True, fromalpha=False, duration=None
+        self, img, is_mask=False, transparent=True, fromalpha=False, duration=None, boost=1.0
     ):
         VideoClip.__init__(self, is_mask=is_mask, duration=duration)
 
         if not isinstance(img, np.ndarray):
             # img is a string or path-like object, so read it in from disk
             img = imread(img)
+            img[:, :, :3] = boost * img[:, :, :3]
+            img = img.astype("uint16") << 8
 
         if len(img.shape) == 3:  # img is (now) a RGB(a) numpy array
             if img.shape[2] == 4:
                 if fromalpha:
-                    img = 1.0 * img[:, :, 3] / 255
+                    img = 1.0 * img[:, :, 3] / 65535
                 elif is_mask:
-                    img = 1.0 * img[:, :, 0] / 255
+                    img = 1.0 * img[:, :, 0] / 65535
                 elif transparent:
-                    self.mask = ImageClip(1.0 * img[:, :, 3] / 255, is_mask=True)
+                    self.mask = ImageClip(1.0 * img[:, :, 3] / 65535, is_mask=True)
                     img = img[:, :, :3]
             elif is_mask:
-                img = 1.0 * img[:, :, 0] / 255
+                img = 1.0 * img[:, :, 0] / 65535
 
         # if the image was just a 2D mask, it should arrive here
         # unchanged
