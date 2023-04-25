@@ -1040,7 +1040,7 @@ class ImageClip(VideoClip):
 
         if not isinstance(img, np.ndarray):
             # img is a string or path-like object, so read it in from disk
-            img = imread(img)
+            img = imread(img).copy()
             img[:, :, :3] = boost * img[:, :, :3]
             img = img.astype("uint16") << 8
 
